@@ -1,0 +1,11 @@
+{
+    "python.pythonPath": "~/CloudWebapp/webapp/venv/bin/python3",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.pylintUseMinimalCheckers": false,
+    "python.linting.pylintArgs": [
+        "--load-plugins",
+        "pylint_flask_sqlalchemy, pylint_flask",
+        "--init-hook"
+    ]
+}
