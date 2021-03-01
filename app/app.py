@@ -1,5 +1,5 @@
 import os
-from flask import Flask, abort, request, jsonify, g, url_for
+from flask import Flask, abort, request, jsonify, g, url_for, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
 from flask import make_response
@@ -11,7 +11,9 @@ import uuid
 import re
 from flask_marshmallow import Marshmallow
 import config
-# from flask_migrate import Migrate
+from flask_migrate import Migrate
+import sys
+from werkzeug.utils import secure_filename
 
 # initialization
 app = Flask(__name__)
@@ -20,18 +22,24 @@ app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = config.SQLALCHEMY_COMMIT_ON_TEARDOWN
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
 
+UPLOAD_FOLDER = '/Users/paragshah/CloudWebapp/webapp/uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+
+# print(os.path.dirname(os.path.realpath(__file__)))
+# print(os.getcwd())
+
 # extensions
 db = SQLAlchemy(app)
-auth = HTTPBasicAuth()
+migrate = Migrate(app, db)
 ma = Marshmallow(app)
-# migrate = Migrate(app, db)
-
+auth = HTTPBasicAuth()
 
 # SQLite Database
 class User(db.Model):
     __tablename__ = 'users'
 
-    id = db.Column('id', db.Text(length=36), default=lambda: str(
+    id = db.Column('id', db.String(length=36), default=lambda: str(
         uuid.uuid4()), primary_key=True)
     username = db.Column(db.String(256), index=True,
                          nullable=False, unique=True)
@@ -65,7 +73,7 @@ class User(db.Model):
 class Book(db.Model):
     __tablename__ = 'books'
 
-    id = db.Column('id', db.Text(length=36), default=lambda: str(
+    id = db.Column('id', db.String(length=36), default=lambda: str(
         uuid.uuid4()), primary_key=True)
     title = db.Column(db.String(256), nullable=False)
     author = db.Column(db.String(256), nullable=False)
@@ -87,6 +95,20 @@ class BookSchema(ma.Schema):
 
 book_schema = BookSchema()
 books_schema = BookSchema(many=True)
+
+class Image(db.Model):
+    __tablename__ = 'images'
+
+    file_id = db.Column('file_id', db.String(length=36), default=lambda: str(
+        uuid.uuid4()), primary_key=True)
+    file_name = db.Column(db.String(256), nullable=False)
+    created_date = db.Column(db.String, default=datetime.now)
+    s3_object_name = db.Column(db.String, default='some_id')
+    user_id = db.Column(db.String(64), nullable=False)
+    # book_id = db.Column(db.String(64), nullable=False)
+
+    def __repr__(self):
+        return '<Image {}>'.format(self.title)
 
 
 @auth.verify_password
@@ -251,20 +273,55 @@ def new_book():
     return response
 
 
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
+
+def allowed_file(filename):
+	return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.route('/books/<id>/image', methods=['POST'])
+@auth.login_required
+def upload_image(id):
+	
+    if 'file' not in request.files:
+        response = jsonify({'message': 'No file part in the request'})
+        response.status_code = 400
+        return response
+
+    file = request.files['file']
+    if file.filename == '':
+        response = jsonify({'message': 'No file selected for uploading'})
+        response.status_code = 400
+        return response
+
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        file_name = filename
+        s3_object_name = 'storing_some_id'
+
+        image = Image(file_name=file_name,
+                      s3_object_name=s3_object_name, user_id=g.user.id)
+        db.session.add(image)
+        db.session.commit()
+
+        response = jsonify({
+            'file_name': image.file_name,
+            's3_object_name': s3_object_name,
+            'file_id': image.file_id,
+            'created_date': image.created_date,
+            'user_id': image.user_id
+        })
+        response.status_code = 201
+        return response
+    else:
+        response = jsonify({'message': 'Allowed file types are png, jpg, jpeg, gif'})
+        response.status_code = 400
+        return response
+
+
 if __name__ == '__main__':
-    if not os.path.exists('db.sqlite'):
+    if not os.path.exists('webapp.sqlite'):
         db.create_all()
     app.run(debug=True)
-
-""" Test Body
-
-Books - 
-{"title": "Atomic Habits", "author": "Chetan", "isbn": "345-24445", "published_date": "Jan, 2021"}
-
-User - 
-# /v1/user = {"username":"parag@gmail.com","password":"Parag123@@@", "first_name":"parag", "last_name":"shah"}
-# /books = {"title": "Atomic Habits", "author": "Chetan", "isbn": "345-24445", "published_date": "Jan, 2021"}
-# /v1/user/self = Authenticated --> {"password":"python3", "first_name":"parag3", "last_name":"shah3"}
-# /v1/user/self = Authenticated
-
-"""
