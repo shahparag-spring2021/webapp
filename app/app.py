@@ -14,6 +14,7 @@ import config
 from flask_migrate import Migrate
 import sys
 from werkzeug.utils import secure_filename
+import boto3
 
 # initialization
 app = Flask(__name__)
@@ -22,9 +23,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = config.SQLALCHEMY_COMMIT_ON_TEARDOWN
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
 
-UPLOAD_FOLDER = '/Users/paragshah/CloudWebapp/webapp/uploads'
+UPLOAD_FOLDER = '/home/ubuntu'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+bucket = config.s3_bucketname
 
 # print(os.path.dirname(os.path.realpath(__file__)))
 # print(os.getcwd())
@@ -80,7 +82,7 @@ class Book(db.Model):
     isbn = db.Column(db.String(64), nullable=False)
     published_date = db.Column(db.String(256), nullable=False)
     book_created = db.Column(db.String, default=datetime.now)
-    user_id = db.Column(db.String(64), nullable=False)
+    user_id = db.Column(db.String(64))
 
     def __repr__(self):
         return '<Book {}>'.format(self.title)
@@ -99,16 +101,26 @@ books_schema = BookSchema(many=True)
 class Image(db.Model):
     __tablename__ = 'images'
 
-    file_id = db.Column('file_id', db.String(length=36), default=lambda: str(
-        uuid.uuid4()), primary_key=True)
+    file_id = db.Column('file_id', db.String(length=36), primary_key=True)
     file_name = db.Column(db.String(256), nullable=False)
     created_date = db.Column(db.String, default=datetime.now)
     s3_object_name = db.Column(db.String, default='some_id')
     user_id = db.Column(db.String(64), nullable=False)
-    # book_id = db.Column(db.String(64), nullable=False)
+    book_id = db.Column(db.String(64), nullable=False)
 
     def __repr__(self):
         return '<Image {}>'.format(self.title)
+
+
+class ImageSchema(ma.Schema):
+    class Meta:
+        fields = ("file_id", "file_name", "author", "isbn",
+                  "published_date", "book_created", "user_id")
+        model = Book
+
+
+image_schema = ImageSchema()
+images_schema = ImageSchema(many=True)
 
 
 @auth.verify_password
@@ -283,25 +295,31 @@ def allowed_file(filename):
 @auth.login_required
 def upload_image(id):
 	
+    book_id = id
     if 'file' not in request.files:
         response = jsonify({'message': 'No file part in the request'})
         response.status_code = 400
         return response
 
     file = request.files['file']
+
     if file.filename == '':
         response = jsonify({'message': 'No file selected for uploading'})
         response.status_code = 400
         return response
 
     if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-        file_name = filename
-        s3_object_name = 'storing_some_id'
-
-        image = Image(file_name=file_name,
+    
+        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        # s3_object_name = 'storing_some_id'
+        file_name = secure_filename(file.filename)
+        file.save(os.path.join(UPLOAD_FOLDER, file_name))
+        file_id = str(uuid.uuid4())
+        s3_object_name = book_id + '/' + file_id + '/' + file_name
+        s3 = boto3.client('s3')
+        s3.upload_file(f"/home/ubuntu/{file_name}", bucket, s3_object_name)
+        
+        image = Image(file_name=file_name, file_id=file_id, book_id=book_id,
                       s3_object_name=s3_object_name, user_id=g.user.id)
         db.session.add(image)
         db.session.commit()
@@ -321,7 +339,29 @@ def upload_image(id):
         return response
 
 
+@app.route('/books/<book_id>/image/<file_id>', methods=['DELETE'])
+@auth.login_required
+def delete_image(book_id, file_id):
+
+    image = Image.query.get(file_id)
+    if image is None:
+        return 'Not found', 404
+    if g.user.id == image.user_id:
+        db.session.delete(image)
+        db.session.commit()
+
+        s3 = boto3.resource('s3')
+        prefix = book_id + '/' + file_id + '/'
+        bucket_id = s3.Bucket(bucket)
+        bucket_id.objects.filter(Prefix=prefix).delete()
+
+        return image_schema.jsonify(image), 204
+    
+    else:
+        return 'Unauthorized Access', 401
+
+
 if __name__ == '__main__':
     if not os.path.exists('webapp.sqlite'):
         db.create_all()
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
