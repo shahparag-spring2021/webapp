@@ -1,5 +1,5 @@
 import os
-from flask import Flask, abort, request, jsonify, g, url_for
+from flask import Flask, abort, request, jsonify, g, url_for, redirect
 from flask_sqlalchemy import SQLAlchemy
 from flask_httpauth import HTTPBasicAuth
 from flask import make_response
@@ -11,7 +11,10 @@ import uuid
 import re
 from flask_marshmallow import Marshmallow
 import config
-# from flask_migrate import Migrate
+from flask_migrate import Migrate
+import sys
+from werkzeug.utils import secure_filename
+import boto3
 
 # initialization
 app = Flask(__name__)
@@ -20,18 +23,25 @@ app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = config.SQLALCHEMY_COMMIT_ON_TEARDOWN
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = config.SQLALCHEMY_TRACK_MODIFICATIONS
 
+UPLOAD_FOLDER = '/home/ubuntu'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+bucket = config.s3_bucketname
+
+# print(os.path.dirname(os.path.realpath(__file__)))
+# print(os.getcwd())
+
 # extensions
 db = SQLAlchemy(app)
-auth = HTTPBasicAuth()
+migrate = Migrate(app, db)
 ma = Marshmallow(app)
-# migrate = Migrate(app, db)
-
+auth = HTTPBasicAuth()
 
 # SQLite Database
 class User(db.Model):
     __tablename__ = 'users'
 
-    id = db.Column('id', db.Text(length=36), default=lambda: str(
+    id = db.Column('id', db.String(length=36), default=lambda: str(
         uuid.uuid4()), primary_key=True)
     username = db.Column(db.String(256), index=True,
                          nullable=False, unique=True)
@@ -65,14 +75,14 @@ class User(db.Model):
 class Book(db.Model):
     __tablename__ = 'books'
 
-    id = db.Column('id', db.Text(length=36), default=lambda: str(
+    id = db.Column('id', db.String(length=36), default=lambda: str(
         uuid.uuid4()), primary_key=True)
     title = db.Column(db.String(256), nullable=False)
     author = db.Column(db.String(256), nullable=False)
     isbn = db.Column(db.String(64), nullable=False)
     published_date = db.Column(db.String(256), nullable=False)
     book_created = db.Column(db.String, default=datetime.now)
-    user_id = db.Column(db.String(64), nullable=False)
+    user_id = db.Column(db.String(64))
 
     def __repr__(self):
         return '<Book {}>'.format(self.title)
@@ -87,6 +97,30 @@ class BookSchema(ma.Schema):
 
 book_schema = BookSchema()
 books_schema = BookSchema(many=True)
+
+class Image(db.Model):
+    __tablename__ = 'images'
+
+    file_id = db.Column('file_id', db.String(length=36), primary_key=True)
+    file_name = db.Column(db.String(256), nullable=False)
+    created_date = db.Column(db.String, default=datetime.now)
+    s3_object_name = db.Column(db.String, default='some_id')
+    user_id = db.Column(db.String(64), nullable=False)
+    book_id = db.Column(db.String(64), nullable=False)
+
+    def __repr__(self):
+        return '<Image {}>'.format(self.title)
+
+
+class ImageSchema(ma.Schema):
+    class Meta:
+        fields = ("file_id", "file_name", "created_date", "s3_object_name",
+                  "user_id", "book_id")
+        model = Image
+
+
+image_schema = ImageSchema()
+images_schema = ImageSchema(many=True)
 
 
 @auth.verify_password
@@ -251,20 +285,81 @@ def new_book():
     return response
 
 
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
+
+def allowed_file(filename):
+	return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.route('/books/<id>/image', methods=['POST'])
+@auth.login_required
+def upload_image(id):
+	
+    book_id = id
+    if 'file' not in request.files:
+        response = jsonify({'message': 'No file part in the request'})
+        response.status_code = 400
+        return response
+
+    file = request.files['file']
+
+    if file.filename == '':
+        response = jsonify({'message': 'No file selected for uploading'})
+        response.status_code = 400
+        return response
+
+    if file and allowed_file(file.filename):
+    
+        file_name = secure_filename(file.filename)
+        file.save(os.path.join(UPLOAD_FOLDER, file_name))
+        file_id = str(uuid.uuid4())
+        s3_object_name = book_id + '/' + file_id + '/' + file_name
+        s3 = boto3.client('s3')
+        s3.upload_file(f"/home/ubuntu/{file_name}", bucket, s3_object_name)
+        
+        image = Image(file_name=file_name, file_id=file_id, book_id=book_id,
+                      s3_object_name=s3_object_name, user_id=g.user.id)
+        db.session.add(image)
+        db.session.commit()
+
+        response = jsonify({
+            'file_name': image.file_name,
+            's3_object_name': s3_object_name,
+            'file_id': image.file_id,
+            'created_date': image.created_date,
+            'user_id': image.user_id
+        })
+        response.status_code = 201
+        return response
+    else:
+        response = jsonify({'message': 'Allowed file types are png, jpg, jpeg, gif'})
+        response.status_code = 400
+        return response
+
+
+@app.route('/books/<book_id>/image/<file_id>', methods=['DELETE'])
+@auth.login_required
+def delete_image(book_id, file_id):
+
+    image = Image.query.get(file_id)
+    if image is None:
+        return 'Not found', 404
+    if g.user.id == image.user_id:
+        db.session.delete(image)
+        db.session.commit()
+
+        s3 = boto3.resource('s3')
+        prefix = book_id + '/' + file_id + '/'
+        bucket_id = s3.Bucket(bucket)
+        bucket_id.objects.filter(Prefix=prefix).delete()
+
+        return image_schema.jsonify(image), 204
+    
+    else:
+        return 'Unauthorized Access', 401
+
+
 if __name__ == '__main__':
-    if not os.path.exists('db.sqlite'):
+    if not os.path.exists('webapp.sqlite'):
         db.create_all()
-    app.run(debug=True)
-
-""" Test Body
-
-Books - 
-{"title": "Atomic Habits", "author": "Chetan", "isbn": "345-24445", "published_date": "Jan, 2021"}
-
-User - 
-# /v1/user = {"username":"parag@gmail.com","password":"Parag123@@@", "first_name":"parag", "last_name":"shah"}
-# /books = {"title": "Atomic Habits", "author": "Chetan", "isbn": "345-24445", "published_date": "Jan, 2021"}
-# /v1/user/self = Authenticated --> {"password":"python3", "first_name":"parag3", "last_name":"shah3"}
-# /v1/user/self = Authenticated
-
-"""
+    app.run(host="0.0.0.0", port=5000, debug=True)
