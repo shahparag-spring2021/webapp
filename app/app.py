@@ -114,9 +114,9 @@ class Image(db.Model):
 
 class ImageSchema(ma.Schema):
     class Meta:
-        fields = ("file_id", "file_name", "author", "isbn",
-                  "published_date", "book_created", "user_id")
-        model = Book
+        fields = ("file_id", "file_name", "created_date", "s3_object_name",
+                  "user_id", "book_id")
+        model = Image
 
 
 image_schema = ImageSchema()
@@ -310,8 +310,6 @@ def upload_image(id):
 
     if file and allowed_file(file.filename):
     
-        # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        # s3_object_name = 'storing_some_id'
         file_name = secure_filename(file.filename)
         file.save(os.path.join(UPLOAD_FOLDER, file_name))
         file_id = str(uuid.uuid4())
