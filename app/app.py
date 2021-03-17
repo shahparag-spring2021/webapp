@@ -109,7 +109,7 @@ class Image(db.Model):
     book_id = db.Column(db.String(64), nullable=False)
 
     def __repr__(self):
-        return '<Image {}>'.format(self.title)
+        return '<Image {}>'.format(self.file_name)
 
 
 class ImageSchema(ma.Schema):
@@ -227,6 +227,17 @@ def auth_api():
 def get_books():
     all_books = Book.query.all()
     result = books_schema.dump(all_books)
+
+    # print(result)
+    # for r in result:
+    #     print(r['id'])
+    #     book_id = print(r['id'])
+    #     image_all = Image.query.filter_by(book_id=id).all()
+    #     result = images_schema.dump(image_all)
+
+    #     if image is None:
+    #         return book_schema.jsonify(book)
+
     return jsonify(result)
 
 
@@ -235,9 +246,29 @@ def book_detail(id):
     book = Book.query.get(id)
     if book is None:
         return 'Not found', 404
+    
     else:
-        book = Book.query.get(id)
-        return book_schema.jsonify(book)
+        image = Image.query.filter_by(book_id=id).first()
+        
+        image_all = Image.query.filter_by(book_id=id).all()
+        result = images_schema.dump(image_all)
+    
+        if image is None:
+            return book_schema.jsonify(book)
+
+        else:
+            response = jsonify({
+                'id': book.id,
+                'title': book.title,
+                'author': book.author,
+                'isbn': book.isbn,
+                'published_date': book.published_date,
+                'book_created': book.book_created,
+                'user_id': book.user_id,
+                'book_images': result
+            })
+            response.status_code = 200
+            return response
 
 
 @app.route("/books/<id>", methods=["DELETE"])
