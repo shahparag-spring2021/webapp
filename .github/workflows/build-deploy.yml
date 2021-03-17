@@ -56,11 +56,10 @@ jobs:
             --application-name ${{ env.CODEDEPLOY_APPLICATION_NAME }} \
             --deployment-config-name CodeDeployDefault.AllAtOnce \
             --deployment-group-name ${{ env.CODEDEPLOY_APPLICATION_DEPLOYMENT_GROUP_NAME }} \
-            --description " CSYE6225 - CodeDeploy" \
-            --s3-location bucket=${{ secrets.S3_CODEDEPLOY_BUCKET}},key=${{ env.ARTIFACT_NAME }},bundleType=zip \
+            --description " CodeDeploy Deployment" \
             --region ${{ env.AWS_REGION }} \
-            --output json
-            
+            --output json \
+            --s3-location bucket=${{ secrets.S3_CODEDEPLOY_BUCKET}},bundleType=zip,key=${{ env.ARTIFACT_NAME}})
             echo $output
             dId=$(echo $output | jq -r '.deploymentId')
             aws deploy wait deployment-successful --deployment-id $dId
