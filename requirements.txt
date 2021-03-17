@@ -10,6 +10,7 @@ autopep8==1.5.4
 bcrypt==3.2.0
 beautifulsoup4==4.9.0
 blinker==1.4
+boto3>=1.15.0
 bs4==0.0.1
 cachetools==4.0.0
 certifi==2019.11.28
@@ -77,8 +78,6 @@ opt-einsum==3.2.0
 osqp==0.6.1
 passlib==1.7.4
 pipenv==2020.11.15
-protobuf==3.11.3
-psycopg2==2.7.7
 psycopg2-binary==2.8.6
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
