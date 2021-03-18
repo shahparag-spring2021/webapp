@@ -1,7 +1,15 @@
 #!/bin/bash
+echo 'install_dependencies'
 cd /home/ubuntu/webapp/
-
-sudo apt-get install python3-setuptools
-sudo python3 -m easy_install install pip
-sudo apt install python3-flask -y
 pip3 install --upgrade -r requirements.txt
+cd app/
+pwd
+ls -al
+export FLASK_APP=app.py
+# sudo rm -rf migrations/
+# flask db init
+sudo chmod -R 777 migrations/
+flask db stamp head
+flask db migrate
+flask db upgrade
+pwd
