@@ -1,7 +1,6 @@
 #!/bin/bash
 cd /home/ubuntu/webapp/
 
-# sudo kill $(sudo lsof -t -i:5000)
 cd app/
 pwd
 ls -al
