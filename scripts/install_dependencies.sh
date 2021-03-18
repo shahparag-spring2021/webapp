@@ -7,6 +7,8 @@ pwd
 ls -al
 export FLASK_APP=app.py
 pwd
+sudo rm -rf migrations/
+flask db init
 flask db stamp head
 flask db migrate
 flask db upgrade
