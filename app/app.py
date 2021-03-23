@@ -285,7 +285,7 @@ def book_delete(id):
         return 'Unauthorized Access', 401
 
 
-@app.route('/books', methods=['POST'])
+@app.route('/mybooks', methods=['POST'])
 @auth.login_required
 def new_book():
     title = request.json.get('title')
