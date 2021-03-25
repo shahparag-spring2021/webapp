@@ -222,20 +222,34 @@ def auth_api():
             'account_updated': g.user.account_updated,
         })
         response.status_code = 200
+
+        app.logger.info('Get user details by auth')
+
+        dur = (time.time() - start) * 1000
+        c.timing("api_auth_get_user_time", dur)
+        c.incr(" api_auth_get_user_count")
+
         return response
     
     if request.method == "PUT":
         if request.json.get('username') is not None:
+            app.logger.info('Username cannot be modified')
             return "Cannot modify username. Please supply first_name, last_name or password", 400
+
         if request.json.get('first_name') is not None:
             g.user.first_name = request.json.get('first_name')
+
         if request.json.get('last_name') is not None:
             g.user.last_name = request.json.get('last_name')
+
         if request.json.get('password') is not None:
             if not validate_password(request.json.get('password')):
+                app.logger.info('Weak password in update')
                 return "Please enter a strong password. Follow NIST guidelines", 400
+
             password = request.json.get('password')
             g.user.hash_password(password)
+
         g.user.account_updated = str(datetime.now())
         print(request.json)
         print(request.json.get('username'))
@@ -245,6 +259,8 @@ def auth_api():
 
         db.session.add(g.user)
         db.session.commit()
+
+        app.logger.info('User details updated')
 
         dur_db = (time.time() - start_db) * 1000
         c.timing("db_update_user_time", dur_db)
@@ -272,6 +288,8 @@ def get_books():
     all_books = Book.query.all()
     result = books_schema.dump(all_books)
 
+    app.logger.info('All books returned')
+
     dur = (time.time() - start) * 1000
     c.timing("api_get_all_books_time", dur)
     c.incr("api_get_all_books_count")
@@ -295,6 +313,7 @@ def book_detail(id):
 
     book = Book.query.get(id)
     if book is None:
+        app.logger.info('Book does not exists')
         return 'Not found', 404
     
     else:
@@ -322,6 +341,7 @@ def book_detail(id):
             })
             response.status_code = 200
 
+            app.logger.info('Get each book details')
             dur = (time.time() - start) * 1000
             c.timing("api_get_book_time", dur)
             c.incr(" api_get_book_count")
@@ -337,6 +357,8 @@ def book_delete(id):
     book = Book.query.get(id)
     if book is None:
         dur = (time.time() - start) * 1000
+
+        app.logger.info('Book does not exist')
         c.timing("api_delete_book_time", dur)
         c.incr(" api_delete_book_count")
 
@@ -346,6 +368,7 @@ def book_delete(id):
         db.session.delete(book)
         db.session.commit()
 
+        app.logger.info('Book deleted')
         dur = (time.time() - start) * 1000
         c.timing("api_delete_book_time", dur)
         c.incr(" api_delete_book_count")
@@ -353,6 +376,7 @@ def book_delete(id):
         return book_schema.jsonify(book)
 
     else:
+        app.logger.info('Unauthorized access to delete book')
         dur = (time.time() - start) * 1000
         c.timing("api_delete_book_time", dur)
         c.incr(" api_delete_book_count")
@@ -391,6 +415,7 @@ def new_book():
     })
     response.status_code = 201
 
+    app.logger.info('New book created')
     dur = (time.time() - start) * 1000
     c.timing("api_new_book_time", dur)
     c.incr(" api_new_book_count")
@@ -411,6 +436,7 @@ def upload_image(id):
 	
     book_id = id
     if 'file' not in request.files:
+        app.logger.info('Image file not provided')
         response = jsonify({'message': 'No file part in the request'})
         response.status_code = 400
         return response
@@ -418,6 +444,7 @@ def upload_image(id):
     file = request.files['file']
 
     if file.filename == '':
+        app.logger.info('No file selected for uploading')
         response = jsonify({'message': 'No file selected for uploading'})
         response.status_code = 400
         return response
@@ -457,6 +484,8 @@ def upload_image(id):
         })
         response.status_code = 201
 
+        app.logger.info('File uploaded to S3 bucket')
+
         dur = (time.time() - start) * 1000
         c.timing("api_upload_image_time", dur)
         c.incr(" api_upload_image_time")
@@ -467,6 +496,7 @@ def upload_image(id):
         response = jsonify({'message': 'Allowed file types are png, jpg, jpeg, gif'})
         response.status_code = 400
 
+        app.logger.info('Invalid image file types')
         dur = (time.time() - start) * 1000
         c.timing("api_upload_image_time", dur)
         c.incr(" api_upload_image_time")
@@ -481,6 +511,8 @@ def delete_image(book_id, file_id):
 
     image = Image.query.get(file_id)
     if image is None:
+
+        app.logger.info('Image not found for deletion')
         dur = (time.time() - start) * 1000
         c.timing("api_delete_image_time", dur)
         c.incr(" api_delete_image_time")
@@ -507,6 +539,7 @@ def delete_image(book_id, file_id):
         dur_s3 = (time.time() - start_s3) * 1000
         c.timing("s3_upload_image_time", dur_s3)
 
+        app.logger.info('Image deleted')
         dur = (time.time() - start) * 1000
         c.timing("api_delete_image_time", dur)
         c.incr(" api_delete_image_time")
@@ -514,6 +547,7 @@ def delete_image(book_id, file_id):
         return image_schema.jsonify(image), 204
     
     else:
+        app.logger.info('Unauthorized access to delete image')
         dur = (time.time() - start) * 1000
         c.timing("api_delete_image_time", dur)
         c.incr(" api_delete_image_time")
