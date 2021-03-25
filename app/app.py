@@ -15,8 +15,11 @@ from flask_migrate import Migrate
 import sys
 from werkzeug.utils import secure_filename
 import boto3
+import time
+import statsd
 
 # initialization
+c = statsd.StatsClient('localhost', 8125)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
 app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
@@ -225,8 +228,14 @@ def auth_api():
 
 @app.route('/books', methods=['GET'])
 def get_books():
+    timer = statsd.Timer('Books endpoint timer')
+    timer.start()
+
     all_books = Book.query.all()
     result = books_schema.dump(all_books)
+
+    timer.stop('Timer stop')
+    c.incr("Books count")
 
     # print(result)
     # for r in result:
@@ -285,7 +294,7 @@ def book_delete(id):
         return 'Unauthorized Access', 401
 
 
-@app.route('/mybooks', methods=['POST'])
+@app.route('/books', methods=['POST'])
 @auth.login_required
 def new_book():
     title = request.json.get('title')

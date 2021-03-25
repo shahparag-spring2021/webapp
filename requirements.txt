@@ -38,3 +38,5 @@ wrapt==1.12.1
 zope.interface==5.2.0
 boto3>=1.15.0
 testresources==2.0.1
+statsd==3.3.0
+Flask-StatsD==0.1.2
