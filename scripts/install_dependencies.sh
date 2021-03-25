@@ -8,7 +8,6 @@ ls -al
 export FLASK_APP=app.py
 # sudo rm -rf migrations/
 # flask db init
-
 sudo chmod -R 777 migrations/
 flask db stamp head
 flask db migrate
