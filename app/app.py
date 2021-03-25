@@ -17,6 +17,7 @@ from werkzeug.utils import secure_filename
 import boto3
 import time
 import statsd
+import logging
 
 # initialization
 c = statsd.StatsClient('localhost', 8125)
@@ -40,7 +41,8 @@ migrate = Migrate(app, db)
 ma = Marshmallow(app)
 auth = HTTPBasicAuth()
 
-logging.basicConfig(filename='csye6225.log', level=logging.DEBUG)
+logging.basicConfig(filename='csye6225.log', level=logging.DEBUG,
+                    format=f'%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s')
 
 # SQLite Database
 class User(db.Model):
