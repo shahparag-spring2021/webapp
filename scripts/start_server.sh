@@ -10,6 +10,8 @@ sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
     -s
 
 cd /home/ubuntu/webapp/app/
+touch csye6225.log
+sudo chmod 777 csye6225.log
 pwd
 
 export FLASK_APP=app.py
