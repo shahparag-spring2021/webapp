@@ -178,6 +178,7 @@ def new_user():
         'account_updated': user.account_updated
     })
     response.status_code = 201
+    c.incr("User create count")
     return response
 
 
