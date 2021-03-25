@@ -229,14 +229,14 @@ def auth_api():
 
 @app.route('/books', methods=['GET'])
 def get_books():
-    timer = statsd.Timer('Books endpoint timer')
-    timer.start()
+    start = time.time()
 
     all_books = Book.query.all()
     result = books_schema.dump(all_books)
 
-    timer.stop('Timer stop')
-    c.incr("Books count")
+    dur = (time.time() - start) * 1000
+    c.timing("all books time", dur)
+    c.incr("books count")
 
     # print(result)
     # for r in result:
