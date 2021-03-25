@@ -40,6 +40,8 @@ migrate = Migrate(app, db)
 ma = Marshmallow(app)
 auth = HTTPBasicAuth()
 
+logging.basicConfig(filename='csye6225.log', level=logging.DEBUG)
+
 # SQLite Database
 class User(db.Model):
     __tablename__ = 'users'
@@ -160,10 +162,16 @@ def new_user():
     last_name = request.json.get('last_name')
 
     if username is None or password is None or first_name is None or last_name is None:
+        app.logger.info(
+            'username is None or password is None or first_name is None or last_name is None')
         return "Please enter username, password, first_name and last_name", 400     # missing arguments
+
     if User.query.filter_by(username=username).first() is not None:
+        app.logger.info('Attempt to create duplicate username')
         return "Username exists. Please use a different username", 400       # existing user
+
     if not validate_password(password):
+        app.logger.info('Weak password')
         return "Please enter a strong password. Follow NIST guidelines", 400
 
     user = User(username=username, first_name=first_name,
@@ -175,8 +183,10 @@ def new_user():
     db.session.add(user)
     db.session.commit()
 
-    dur_db = (time.time() - start_db)
+    dur_db = (time.time() - start_db) * 1000
     c.timing("db_create_user_time", dur_db)
+
+    app.logger.info('%s created successfully', username)
 
     response = jsonify({
         'id': user.id,
@@ -188,7 +198,7 @@ def new_user():
     })
     response.status_code = 201
 
-    dur = (time.time() - start)
+    dur = (time.time() - start) * 1000
     c.timing("api_create_user_time", dur)
     c.incr(" api_create_user_count")
 
@@ -234,7 +244,7 @@ def auth_api():
         db.session.add(g.user)
         db.session.commit()
 
-        dur_db = (time.time() - start_db)
+        dur_db = (time.time() - start_db) * 1000
         c.timing("db_update_user_time", dur_db)
         
         response = jsonify({
@@ -246,7 +256,7 @@ def auth_api():
         })
         response.status_code = 204
 
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_auth_user_time", dur)
         c.incr(" api_auth_user_count")
 
@@ -260,7 +270,7 @@ def get_books():
     all_books = Book.query.all()
     result = books_schema.dump(all_books)
 
-    dur = (time.time() - start)
+    dur = (time.time() - start) * 1000
     c.timing("api_get_all_books_time", dur)
     c.incr("api_get_all_books_count")
 
@@ -292,7 +302,7 @@ def book_detail(id):
         result = images_schema.dump(image_all)
     
         if image is None:
-            dur = (time.time() - start)
+            dur = (time.time() - start) * 1000
             c.timing("api_get_book_time", dur)
             c.incr(" api_get_book_count")
             return book_schema.jsonify(book)
@@ -310,7 +320,7 @@ def book_detail(id):
             })
             response.status_code = 200
 
-            dur = (time.time() - start)
+            dur = (time.time() - start) * 1000
             c.timing("api_get_book_time", dur)
             c.incr(" api_get_book_count")
 
@@ -324,7 +334,7 @@ def book_delete(id):
 
     book = Book.query.get(id)
     if book is None:
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_delete_book_time", dur)
         c.incr(" api_delete_book_count")
 
@@ -334,14 +344,14 @@ def book_delete(id):
         db.session.delete(book)
         db.session.commit()
 
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_delete_book_time", dur)
         c.incr(" api_delete_book_count")
 
         return book_schema.jsonify(book)
 
     else:
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_delete_book_time", dur)
         c.incr(" api_delete_book_count")
 
@@ -379,7 +389,7 @@ def new_book():
     })
     response.status_code = 201
 
-    dur = (time.time() - start)
+    dur = (time.time() - start) * 1000
     c.timing("api_new_book_time", dur)
     c.incr(" api_new_book_count")
 
@@ -422,7 +432,7 @@ def upload_image(id):
         s3 = boto3.client('s3')
         s3.upload_file(f"/home/ubuntu/{file_name}", bucket, s3_object_name)
 
-        dur_s3 = (time.time() - start_s3)
+        dur_s3 = (time.time() - start_s3) * 1000
         c.timing("s3_upload_image_time", dur_s3)
         
         image = Image(file_name=file_name, file_id=file_id, book_id=book_id,
@@ -433,7 +443,7 @@ def upload_image(id):
         db.session.add(image)
         db.session.commit()
 
-        dur_db = (time.time() - start_db)
+        dur_db = (time.time() - start_db) * 1000
         c.timing("db_upload_image_time", dur_db)
 
         response = jsonify({
@@ -445,7 +455,7 @@ def upload_image(id):
         })
         response.status_code = 201
 
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_upload_image_time", dur)
         c.incr(" api_upload_image_time")
 
@@ -455,7 +465,7 @@ def upload_image(id):
         response = jsonify({'message': 'Allowed file types are png, jpg, jpeg, gif'})
         response.status_code = 400
 
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_upload_image_time", dur)
         c.incr(" api_upload_image_time")
 
@@ -469,7 +479,7 @@ def delete_image(book_id, file_id):
 
     image = Image.query.get(file_id)
     if image is None:
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_delete_image_time", dur)
         c.incr(" api_delete_image_time")
 
@@ -482,7 +492,7 @@ def delete_image(book_id, file_id):
         db.session.delete(image)
         db.session.commit()
 
-        dur_db = (time.time() - start_db)
+        dur_db = (time.time() - start_db) * 1000
         c.timing("db_delete_image_time", dur_db)
 
         start_s3 = time.time()
@@ -492,17 +502,17 @@ def delete_image(book_id, file_id):
         bucket_id = s3.Bucket(bucket)
         bucket_id.objects.filter(Prefix=prefix).delete()
 
-        dur_s3 = (time.time() - start_s3)
+        dur_s3 = (time.time() - start_s3) * 1000
         c.timing("s3_upload_image_time", dur_s3)
 
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_delete_image_time", dur)
         c.incr(" api_delete_image_time")
 
         return image_schema.jsonify(image), 204
     
     else:
-        dur = (time.time() - start)
+        dur = (time.time() - start) * 1000
         c.timing("api_delete_image_time", dur)
         c.incr(" api_delete_image_time")
 
