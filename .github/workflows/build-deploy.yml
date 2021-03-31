@@ -54,7 +54,7 @@ jobs:
         run: | 
             output=$(aws deploy create-deployment \
             --application-name ${{ env.CODEDEPLOY_APPLICATION_NAME }} \
-            --deployment-config-name CodeDeployDefault.AllAtOnce \
+            --deployment-config-name CodeDeployDefault.OneAtATime \
             --deployment-group-name ${{ env.CODEDEPLOY_APPLICATION_DEPLOYMENT_GROUP_NAME }} \
             --description " CodeDeploy Deployment" \
             --region ${{ env.AWS_REGION }} \
