@@ -281,6 +281,11 @@ def auth_api():
         return response
 
 
+@app.route('/', methods=['GET'])
+def default_route():
+
+    return Response(status=200)
+
 @app.route('/books', methods=['GET'])
 def get_books():
     start = time.time()
