@@ -41,7 +41,7 @@ migrate = Migrate(app, db)
 ma = Marshmallow(app)
 auth = HTTPBasicAuth()
 
-logging.basicConfig(filename='/home/ubuntu/webapp/app/csye6225.log', level=logging.DEBUG,
+logging.basicConfig(filename='/home/ubuntu/webapp/app/csye6225.log', level=logging.INFO,
                     format=f'%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s')
 
 # SQLite Database
