@@ -280,11 +280,12 @@ def auth_api():
 
         return response
 
+@app.route('/health', methods=['GET'])
+def health_check():
 
-@app.route('/', methods=['GET'])
-def default_route():
-
-    return Response(status=200)
+    resp = jsonify(success=True)
+    resp.status_code = 200
+    return resp
 
 @app.route('/books', methods=['GET'])
 def get_books():
