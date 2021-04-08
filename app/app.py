@@ -120,11 +120,6 @@ class Image(db.Model):
     def __repr__(self):
         return '<Image {}>'.format(self.file_name)
 
-sns_message = {
-'recipient': useremail,
-'message': 'You have created a book. Book id: ' + bookid + '\n ' + 'Book link: ' + "prod.phutran.me/book/" + bookid
-}
-sns_client.publish(TopicArn="arn:aws:sns:us-east-1:709891834787:book_api_topic", Message=json.dumps(sns_message))
 class ImageSchema(ma.Schema):
     class Meta:
         fields = ("file_id", "file_name", "created_date", "s3_object_name",
