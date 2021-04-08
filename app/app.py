@@ -375,7 +375,7 @@ def book_delete(id):
     if g.user.id == book.user_id:
 
         sns_message = {
-            'user_email': book.user_id,
+            'user_email': g.user.username,
             'message': 'You deleted a book. Book id: ' + book.id
         }
 
