@@ -441,6 +441,8 @@ def new_book():
         'message': 'You created a book. Book id: ' + book.id + '\n ' + 'Book link: ' + "prod.paragshah.me/book/" + book.id
     }
 
+    print('** This is SNS message', sns_message)
+
     sns_client.publish(TopicArn="arn:aws:sns:us-east-1:578033826244:sns_topic",
                    Message=json.dumps(sns_message))
 
