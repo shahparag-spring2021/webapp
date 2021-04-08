@@ -44,6 +44,8 @@ auth = HTTPBasicAuth()
 logging.basicConfig(filename='/home/ubuntu/webapp/app/csye6225.log', level=logging.INFO,
                     format=f'%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s')
 
+sns_client = boto3.client('sns', region_name='us-east-1')
+
 # SQLite Database
 class User(db.Model):
     __tablename__ = 'users'
@@ -118,7 +120,11 @@ class Image(db.Model):
     def __repr__(self):
         return '<Image {}>'.format(self.file_name)
 
-
+sns_message = {
+'recipient': useremail,
+'message': 'You have created a book. Book id: ' + bookid + '\n ' + 'Book link: ' + "prod.phutran.me/book/" + bookid
+}
+sns_client.publish(TopicArn="arn:aws:sns:us-east-1:709891834787:book_api_topic", Message=json.dumps(sns_message))
 class ImageSchema(ma.Schema):
     class Meta:
         fields = ("file_id", "file_name", "created_date", "s3_object_name",
@@ -371,6 +377,15 @@ def book_delete(id):
         return 'Not found', 404
 
     if g.user.id == book.user_id:
+
+        sns_message = {
+            'user_email': book.user_id,
+            'message': 'You deleted a book. Book id: ' + book.id
+        }
+
+        sns_client.publish(TopicArn="arn:aws:sns:us-east-1:578033826244:sns_topic",
+                           Message=json.dumps(sns_message))
+
         db.session.delete(book)
         db.session.commit()
 
@@ -425,6 +440,14 @@ def new_book():
     dur = (time.time() - start) * 1000
     c.timing("api_new_book_time", dur)
     c.incr(" api_new_book_count")
+
+    sns_message = {
+        'user_email': book.user_id,
+        'message': 'You created a book. Book id: ' + book.id + '\n ' + 'Book link: ' + "prod.paragshah.me/book/" + book.id
+    }
+
+    sns_client.publish(TopicArn="arn:aws:sns:us-east-1:578033826244:sns_topic",
+                   Message=json.dumps(sns_message))
 
     return response
 
