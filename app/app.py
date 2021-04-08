@@ -18,6 +18,7 @@ import boto3
 import time
 import statsd
 import logging
+import json
 
 # initialization
 c = statsd.StatsClient('localhost', 8125)
