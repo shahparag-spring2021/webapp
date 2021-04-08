@@ -438,7 +438,7 @@ def new_book():
     c.incr(" api_new_book_count")
 
     sns_message = {
-        'user_email': book.user_id,
+        'user_email': g.user.username,
         'message': 'You created a book. Book id: ' + book.id + '\n ' + 'Book link: ' + "prod.paragshah.me/book/" + book.id
     }
 
