@@ -374,9 +374,11 @@ def book_delete(id):
 
     if g.user.id == book.user_id:
 
+        email_message = 'You deleted a book. Book title: ' + book.title
+
         sns_message = {
             'user_email': g.user.username,
-            'message': 'You deleted a book. Book id: ' + book.id
+            'message': email_message
         }
 
         sns_client.publish(TopicArn="arn:aws:sns:us-east-1:578033826244:sns_topic",
@@ -437,9 +439,10 @@ def new_book():
     c.timing("api_new_book_time", dur)
     c.incr(" api_new_book_count")
 
+    email_message = 'You created a book. Book title: ' + book.title + '. Book link: ' + 'prod.paragshah.me/books/' + book.id
     sns_message = {
         'user_email': g.user.username,
-        'message': 'You created a book. Book id: ' + book.id + '\n ' + 'Book link: ' + "prod.paragshah.me/book/" + book.id
+        'message': email_message
     }
 
     app.logger.info('** This is SNS message', sns_message)
